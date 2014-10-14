@@ -8,7 +8,7 @@ using std::endl;
 using std::vector;
 
 // Constructor only use to initialize root
-Node::Node(MemType t) {
+Node::Node(MemType t) : subtreeStatus(MAX_LEVEL, 0){
   parent = NULL;
   left = NULL;
   right = NULL;
@@ -16,12 +16,11 @@ Node::Node(MemType t) {
   pid = -1;
   level = 0;
   status = FREE;
-  subtreeStatus(31, 0);
   incrementStatus(level);
 }
 
 // Contructor for split nodes
-Node::Node(Node *p, MemType t, int l) {
+Node::Node(Node *p, MemType t, int l) : subtreeStatus(MAX_LEVEL, 0){
   parent = p;
   left = NULL;
   right = NULL;
@@ -29,7 +28,6 @@ Node::Node(Node *p, MemType t, int l) {
   pid = -1;
   level = l;
   status = FREE;
-  subtreeStatus(31, 0);
   incrementStatus(level);
 }
 

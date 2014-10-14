@@ -23,7 +23,10 @@ bool freeNode(map<int, Node *> &memLocation, int pid) {
   Node *n = memLocation[pid];
   vector<Node *> toBeDeleted;
   n->free(toBeDeleted, n->getLevel());
-  
+  for (vector<Node *>::iterator n = toBeDeleted.begin(); n != toBeDeleted.end(); n++) {
+    delete *n;
+    memLocation.erase((*n)->getPID());
+  }
   return true;
 }
 
@@ -52,5 +55,8 @@ int main() {
   freeNode(memLocation, 1758);
   root->printTree(stack);
 
+  // Clean up the memory
+  
+  delete root;
   return 0;
 }
