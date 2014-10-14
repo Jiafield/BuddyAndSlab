@@ -16,7 +16,8 @@ Node::Node(MemType t) {
   pid = -1;
   level = 0;
   status = FREE;
-  subtreeStatus[0] = 1;
+  subtreeStatus(31, 0);
+  incrementStatus(level);
 }
 
 // Contructor for split nodes
@@ -28,20 +29,9 @@ Node::Node(Node *p, MemType t, int l) {
   pid = -1;
   level = l;
   status = FREE;
-  subtreeStatus[l] = 1;
+  subtreeStatus(31, 0);
+  incrementStatus(level);
 }
-
-Node::Node(int pid, int level, MemType t) {
-  parent = NULL;
-  left = NULL;
-  right = NULL;
-  type = t;
-  this->pid = pid;
-  this->level = level;
-  status = ALLOCATED;
-}
-
-bool Node::isFree() {return status == FREE;}
 
 int Node::getPID() {return pid;}
 
@@ -49,42 +39,9 @@ int Node::getLevel() {return level;}
 
 MemType Node::getType() {return type;}
 
-void Node::free(vector<Node *> &toBeDeleted, int l) {
-  if (parent && parent->hasLevel(level)) {
-    cout << "Start free " << pid << endl;
-    // Case 1: the node's sibling is also free, merge up
-    cout << "sibling is free " << endl;
-    toBeDeleted.push_back(parent->left);
-    toBeDeleted.push_back(parent->right);
-    parent->left = NULL;
-    parent->right = NULL;
-    parent->status = FREE;
-    parent->free(toBeDeleted, l);
-  } else {
-    // Case 2: the node's sibling is allocated
-    cout << "sibling is not free " << endl;
-    this->status = FREE;
-    // Update subtree status
-    Node *p = this;
-    while (p) {
-      for (int i = l; i > level; i--)
-	p->eraseStatus(i);
-      p->incrementStatus(level);
-      p = p->parent;
-    }
-  }
-}
 
 bool Node::hasLevel(int l) {
-  return subtreeStatus.find(l) != subtreeStatus.end() && subtreeStatus[l] > 0;
-}
-
-void Node::initStatus(int l) {
-  subtreeStatus[l] = 1;
-}
-
-void Node::eraseStatus(int l) {
-  subtreeStatus.erase(l);
+  return subtreeStatus[l] > 0;
 }
 
 void Node::decrementStatus(int l) {
@@ -146,7 +103,7 @@ Node * Node::split(int splitLevel, int targetLevel) {
     // Update subtree status
     decrementStatus(splitLevel);
     for (int i = splitLevel + 1; i <= targetLevel; i++)
-      initStatus(i);
+      incrementStatus(i);
     // continue to find the split node
     if (left->hasLevel(splitLevel)) {
       return left->split(splitLevel, targetLevel);
@@ -159,7 +116,7 @@ Node * Node::split(int splitLevel, int targetLevel) {
     status = BRANCH;
     decrementStatus(level);
     for (int i = level + 1; i <= targetLevel; i++)
-      initStatus(i);
+      incrementStatus(i);
     // split the node
     left = new Node(this, type, level + 1);
     right = new Node(this, type, level + 1);
@@ -168,12 +125,38 @@ Node * Node::split(int splitLevel, int targetLevel) {
   }
 }
 
+void Node::free(vector<Node *> &toBeDeleted, int l) {
+  if (parent && parent->hasLevel(level)) {
+    cout << "Start free " << pid << endl;
+    // Case 1: the node's sibling is also free, merge up
+    cout << "sibling is free " << endl;
+    toBeDeleted.push_back(parent->left);
+    toBeDeleted.push_back(parent->right);
+    parent->left = NULL;
+    parent->right = NULL;
+    parent->status = FREE;
+    parent->free(toBeDeleted, l);
+  } else {
+    // Case 2: the node's sibling is not free
+    cout << "sibling is not free " << endl;
+    this->status = FREE;
+    // Update subtree status
+    Node *p = this;
+    while (p) {
+      for (int i = l; i > level; i--)
+	p->decrementStatus(i);
+      p->incrementStatus(level);
+      p = p->parent;
+    }
+  }
+}
+
 void Node::printTree(vector<int> &stack) {
   // Base case, print leaf node
   if (!left && !right) {
     for (vector<int>::iterator it = stack.begin(); it != stack.end(); it++)
       cout << *it;
-    if (this->isFree())
+    if (status == FREE)
       cout << " free" << endl;
     else
       cout << " " << this->getPID() << endl;

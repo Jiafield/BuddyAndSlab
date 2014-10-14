@@ -2,11 +2,12 @@
 #define treeObject
 
 #include <vector>
-#include <map>
 #include <iostream>
+#include <map>
 
 typedef enum {SLAB, BUDDY} MemType;
 typedef enum {FREE, ALLOCATED, BRANCH} NodeStatus;
+#define MAX_LEVEL 31
 
 using std::vector;
 using std::map;
@@ -23,7 +24,7 @@ private:
   int pid;
   int level;
   NodeStatus status;    // True means the node is free, false means this node has been allocated to some process.
-  map<int, int> subtreeStatus; //Store the subtree status below the current node
+  vector<int> subtreeStatus; //Store the subtree status below the current node
 
 public:
   // Constructor only use to initialize root
@@ -32,25 +33,11 @@ public:
   // Contructor for split nodes
   Node(Node *p, MemType t, int l);
 
-  Node(int pid, int level, MemType t);
-
-  Node *getParent();
-  
-  Node *getLeft();
-  
-  Node *getRight();
-
   bool hasLevel(int l);
-
-  void initStatus(int l);
-
-  void eraseStatus(int l);
 
   void decrementStatus(int l);
 
   void incrementStatus(int l);
-
-  bool isFree();
 
   int getPID();
 
