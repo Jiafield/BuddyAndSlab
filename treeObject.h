@@ -77,6 +77,7 @@ class MemoryManager {
   Node *alloc(int pid, UNIT size);
   Node *buddyAlloc(int pid, UNIT size);
   Node *slabAlloc(int pid, UNIT size);
+  Node *borrowSlabAlloc(int pid, UNIT size);
   Node *realloc(int pid, UNIT size);
   bool free(int pid);
   void dump();

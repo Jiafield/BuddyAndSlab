@@ -21,8 +21,7 @@ int sizeToLevel(UNIT size) {
 }
 
 UNIT nextPower2(UNIT size) {
-  // todo
-  return size;  
+  return pow(2, (ceil(log2(size))));  
 }
 
 bool isSlabSize(UNIT size, UNIT slabSize) {

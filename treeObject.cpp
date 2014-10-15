@@ -12,7 +12,7 @@ using std::map;
 MemoryManager::MemoryManager(UNIT total, int portion, UNIT slabSize) {
   totalSpace = total;
   slabFreeSpace = total / portion;
-  buddyFreeSpace = total - slabSize;
+  buddyFreeSpace = total - slabFreeSpace;
   this->slabSize = slabSize;
 
   totalLevel = sizeToLevel(total);
@@ -30,7 +30,7 @@ MemoryManager::MemoryManager(UNIT total, int portion, UNIT slabSize) {
 Node *MemoryManager::alloc(int pid, UNIT size) {
   size = nextPower2(size);
   // Case 1: size is a slab size
-  if (isSlabSize(size, slabSize)) {
+  if (size == slabSize) {
     return slabAlloc(pid, size);
   }
   // Case 2: size is not slab size
@@ -45,11 +45,13 @@ Node *MemoryManager::buddyAlloc(int pid, UNIT size) {
     pidToPointer[pid] = newNode;
     return newNode;
   } else {
-    //borrow
-    cout << "No space in buddy for " << pid << endl;
-    cout << "Borrow from slab" << endl;
-    // Todo
-    return NULL;
+    //borrow from slab
+    if (slabFreeSpace >= size) {
+      cout << "Alloc: No space in buddy for " << pid << endl;
+      cout << "Borrow from slab" << endl;
+      return borrowSlabAlloc(pid, size);
+    } else 
+      return NULL;
   }
 }
 
@@ -61,23 +63,42 @@ Node *MemoryManager::slabAlloc(int pid, UNIT size) {
     return newNode;
   } else {
     // Borrow from buddy
-    cout << "No space in slab for " << pid << endl;
-    cout << "Borrow from buddy" << endl;
-    return buddyAlloc(pid, size);
+    if (buddyFreeSpace >= size) {
+      cout << "Alloc: No space in slab for " << pid << endl;
+      cout << "Borrow from buddy" << endl;
+      return buddyAlloc(pid, size);
+    } else
+      return NULL;
+  }
+}
+
+Node *MemoryManager::borrowSlabAlloc(int pid, UNIT size) {
+  if (slabFreeSpace >= size) {
+    slabFreeSpace -= size;
+    int targetLevel = slabTotalLevel - sizeToLevel(size);
+    Node *newNode = slabRoot->alloc(pid, targetLevel, slabTotalLevel);
+    pidToPointer[pid] = newNode;
+    return newNode;
+  } else {
+    return NULL;
   }
 }
 
 Node *MemoryManager::realloc(int pid, UNIT size) {
+  // Look up the pid in the pid to pointer map
   if (pidToPointer.find(pid) == pidToPointer.end()) {
     cout << "Realloc: never allocated memory for " << pid << " before." << endl;
     return NULL;
   }
+  // Check if the original size fit for the new size
   Node *originNode = pidToPointer[pid];
+  size = nextPower2(size);
   int targetLevel;
-  if (isSlabSize(size, slabSize))
+  if (size == slabSize)
     targetLevel = slabLevel;
   else 
     targetLevel = totalLevel - sizeToLevel(size);
+
   if (targetLevel == originNode->getLevel()) {
     // Case 1: the original size fit the new size
     return originNode;
@@ -161,7 +182,7 @@ void Node::incrementStatus(int l) {
 Node* Node::alloc(int p, int l, int totalLevel) {
   // Base case:
   if (level == l && status == FREE) {
-    cout << "Find free node for " << p << " level = " << level <<  endl;
+    //cout << "Find free node for " << p << " level = " << level <<  endl;
     decrementStatus(l);
     status = ALLOCATED;
     pid = p;
@@ -178,7 +199,7 @@ Node* Node::alloc(int p, int l, int totalLevel) {
     }
   } else {
     // Case 2: need to split a free node to get the target level node
-    cout << "Need to split for " << p << endl;
+    //cout << "Need to split for " << p << endl;
     // Find the lowest level that could split
     int splitLevel = -1;
     for (int i = l - 1; i >= 0; i--) {
@@ -189,7 +210,7 @@ Node* Node::alloc(int p, int l, int totalLevel) {
     }
     // No level has free space to split, return false
     if (splitLevel == -1) {
-      cout << "No space for alloc " << p << endl;
+      //cout << "No space for alloc " << p << endl;
       return NULL;
     }
     // Split
