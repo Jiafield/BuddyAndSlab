@@ -3,34 +3,15 @@
 #include <map>
 #include <vector>
 #include <iostream>
+#include <math.h>
 
 using std::map;
 using std::vector;
 using std::cout;
 using std::endl;
 
-Node *initSystem(int portion, UNIT slabsize) {
-  Node *root = new Node(BUDDY);
-
-  return root;  
-}
-
-bool freeNode(map<int, Node *> &memLocation, int pid) {
-  if (memLocation.find(pid) == memLocation.end()) {
-    cout << "couldn't find process " << pid << endl;
-    return false;
-  }
-  Node *n = memLocation[pid];
-  vector<Node *> toBeDeleted;
-  n->free(toBeDeleted, n->getLevel());
-  for (vector<Node *>::iterator n = toBeDeleted.begin(); n != toBeDeleted.end(); n++) {
-    delete *n;
-    memLocation.erase((*n)->getPID());
-  }
-  return true;
-}
-
 int main() {
+  /*
   Node *root = initSystem(8, 512);
   //cout << "Successfully initialized" << endl;
   vector<int> stack;
@@ -57,6 +38,6 @@ int main() {
 
   // Clean up the memory
   
-  delete root;
+  delete root;*/
   return 0;
 }

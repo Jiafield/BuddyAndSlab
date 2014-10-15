@@ -1,18 +1,103 @@
 #include <iostream>
 #include <vector>
+#include <map>
 #include "treeObject.h"
 #include "tokenizer.h"
 
 using std::cout;
 using std::endl;
 using std::vector;
+using std::map;
+
+MemoryManager::MemoryManager(UNIT total, int portion, UNIT slabSize) {
+  totalSpace = total;
+  slabFreeSpace = total / portion;
+  buddyFreeSpace = total - slabSize;
+  this->slabSize = slabSize;
+
+  totalLevel = sizeToLevel(total);
+  slabTotalLevel = sizeToLevel(slabFreeSpace);
+  slabLevel = slabTotalLevel - sizeToLevel(slabSize);
+  slabHeadLevel = totalLevel - sizeToLevel(slabFreeSpace);
+ 
+  root = new Node(totalLevel);
+  slabRoot = new Node(slabLevel);
+
+  // Mark the slab head in the buddy tree;
+  root->alloc(-1, slabHeadLevel, totalLevel); 
+}
+
+Node *MemoryManager::alloc(int pid, UNIT size) {
+  size = nextPower2(size);
+  // Case 1: size is a slab size
+  if (isSlabSize(size, slabSize)) {
+    return slabAlloc(pid, size);
+  }
+  // Case 2: size is not slab size
+  return buddyAlloc(pid, size);
+}
+
+Node *MemoryManager::buddyAlloc(int pid, UNIT size) {
+  if (buddyFreeSpace >= size) {
+    buddyFreeSpace -= size;
+    int targetLevel = totalLevel - sizeToLevel(size);
+    Node *newNode = root->alloc(pid, targetLevel, totalLevel);
+    pidToPointer[pid] = newNode;
+    return newNode;
+  } else {
+    //borrow
+    cout << "No space in buddy for " << pid << endl;
+    cout << "Borrow from slab" << endl;
+    // Todo
+    return NULL;
+  }
+}
+
+Node *MemoryManager::slabAlloc(int pid, UNIT size) {
+  if (slabFreeSpace >= size) {
+    slabFreeSpace -= slabSize;
+    Node *newNode = slabRoot->alloc(pid, slabLevel, slabTotalLevel);
+    pidToPointer[pid] = newNode;
+    return newNode;
+  } else {
+    //borrow
+    cout << "No space in slab for " << pid << endl;
+    cout << "Borrow from buddy" << endl;
+    return buddyAlloc(pid, size);
+  }
+}
+
+Node *MemoryManager::realloc(int pid, UNIT size) {
+  return NULL;
+}
+
+bool MemoryManager::free(int pid) {
+  if (pidToPointer.find(pid) != pidToPointer.end()) {
+    // Case 1: the pid in tree
+    Node *n = pidToPointer[pid];
+    vector<Node *> toBeDeleted;
+    n->free(toBeDeleted, n->getLevel());
+    for (vector<Node *>::iterator n = toBeDeleted.begin(); n != toBeDeleted.end(); n++) {
+      delete *n;
+      pidToPointer.erase((*n)->getPID());
+    }
+    return true;
+  } else {
+    // Case 2: no where to find pid
+    cout << "couldn't find process " << pid << endl;
+    return false;
+  }
+}
+
+void MemoryManager::dump() {
+
+}
 
 // Constructor only use to initialize root
-Node::Node(MemType t) : subtreeStatus(MAX_LEVEL, 0){
+Node::Node(int totalLevel) : subtreeStatus(totalLevel + 1, 0){
   parent = NULL;
   left = NULL;
   right = NULL;
-  type = t;
   pid = -1;
   level = 0;
   status = FREE;
@@ -20,11 +105,10 @@ Node::Node(MemType t) : subtreeStatus(MAX_LEVEL, 0){
 }
 
 // Contructor for split nodes
-Node::Node(Node *p, MemType t, int l) : subtreeStatus(MAX_LEVEL, 0){
+Node::Node(Node *p, int l, int totalLevel) : subtreeStatus(totalLevel + 1, 0){
   parent = p;
   left = NULL;
   right = NULL;
-  type = t;
   pid = -1;
   level = l;
   status = FREE;
@@ -34,9 +118,6 @@ Node::Node(Node *p, MemType t, int l) : subtreeStatus(MAX_LEVEL, 0){
 int Node::getPID() {return pid;}
 
 int Node::getLevel() {return level;}
-
-MemType Node::getType() {return type;}
-
 
 bool Node::hasLevel(int l) {
   return subtreeStatus[l] > 0;
@@ -50,24 +131,23 @@ void Node::incrementStatus(int l) {
   subtreeStatus[l]++;
 }
 
-bool Node::alloc(int p, int l, map<int, Node *> &memLocation) {
+Node* Node::alloc(int p, int l, int totalLevel) {
   // Base case:
   if (level == l && status == FREE) {
     cout << "Find free node for " << p << " level = " << level <<  endl;
     decrementStatus(l);
     status = ALLOCATED;
     pid = p;
-    memLocation[p] = this;
-    return true;
+    return this;
   }
 
   if (hasLevel(l)) {
     // Case 1: there are free node in the level already
     decrementStatus(l);
     if (left->hasLevel(l)) {
-      return left->alloc(p, l, memLocation);
+      return left->alloc(p, l, totalLevel);
     } else {
-      return right->alloc(p, l, memLocation);
+      return right->alloc(p, l, totalLevel);
     }
   } else {
     // Case 2: need to split a free node to get the target level node
@@ -83,15 +163,15 @@ bool Node::alloc(int p, int l, map<int, Node *> &memLocation) {
     // No level has free space to split, return false
     if (splitLevel == -1) {
       cout << "No space for alloc " << p << endl;
-      return false;
+      return NULL;
     }
     // Split
-    Node *n = split(splitLevel, l);
-    return n->alloc(p, l, memLocation);
+    Node *n = split(splitLevel, l, totalLevel);
+    return n->alloc(p, l, totalLevel);
   }
 }
 
-Node * Node::split(int splitLevel, int targetLevel) {
+Node * Node::split(int splitLevel, int targetLevel, int totalLevel) {
   // Base case: already arrived at the target level   
   if (level == targetLevel) {
     return this;
@@ -104,9 +184,9 @@ Node * Node::split(int splitLevel, int targetLevel) {
       incrementStatus(i);
     // continue to find the split node
     if (left->hasLevel(splitLevel)) {
-      return left->split(splitLevel, targetLevel);
+      return left->split(splitLevel, targetLevel, totalLevel);
     } else {
-      return right->split(splitLevel, targetLevel);
+      return right->split(splitLevel, targetLevel, totalLevel);
     }
   } else {
     // Case2: split the current node
@@ -116,10 +196,10 @@ Node * Node::split(int splitLevel, int targetLevel) {
     for (int i = level + 1; i <= targetLevel; i++)
       incrementStatus(i);
     // split the node
-    left = new Node(this, type, level + 1);
-    right = new Node(this, type, level + 1);
+    left = new Node(this, level + 1, totalLevel);
+    right = new Node(this, level + 1, totalLevel);
     // Continue with left node
-    return left->split(splitLevel, targetLevel);
+    return left->split(splitLevel, targetLevel, totalLevel);
   }
 }
 

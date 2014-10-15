@@ -4,9 +4,10 @@
 #include <vector>
 #include <iostream>
 #include <map>
+#include "tokenizer.h"
 
-typedef enum {SLAB, BUDDY} MemType;
 typedef enum {FREE, ALLOCATED, BRANCH} NodeStatus;
+typedef enum {BUDDY, SLAB} MemType;
 #define MAX_LEVEL 31
 
 using std::vector;
@@ -15,12 +16,11 @@ using std::cout;
 using std::endl;
 
 class Node {
-private:
+ private:
   Node *parent;
   Node *left;
   Node *right;
 
-  MemType type;
   int pid;
   int level;
   NodeStatus status;    // True means the node is free, false means this node has been allocated to some process.
@@ -28,10 +28,10 @@ private:
 
 public:
   // Constructor only use to initialize root
-  Node(MemType t);
+  Node(int totalLevel);
 
   // Contructor for split nodes
-  Node(Node *p, MemType t, int l);
+  Node(Node *p, int l, int totalLevel);
 
   bool hasLevel(int l);
 
@@ -43,11 +43,9 @@ public:
 
   int getLevel();
 
-  MemType getType();
-
-  bool alloc(int p, int l, map<int, Node *> &memLocation);
+  Node *alloc(int p, int l, int totalLevel);
   
-  Node *split(int splitLevel, int targetLevel);
+  Node *split(int splitLevel, int targetLevel, int totalLevel);
 
   void free(vector<Node *> &toBeDeleted, int l);
 
@@ -56,5 +54,35 @@ public:
   ~Node();
 
 };
+
+class MemoryManager {
+ private:
+  Node *root;
+  Node *slabRoot;
+
+  UNIT totalSpace;
+  UNIT buddyFreeSpace;
+  UNIT slabFreeSpace;
+  UNIT slabSize;
+
+  int totalLevel;
+  int slabTotalLevel;
+  int slabLevel;
+  int slabHeadLevel;
+  // Store the pid and node mapping
+  map<int, Node *> pidToPointer;
+  
+ public:
+  MemoryManager(UNIT total, int portion, UNIT slabSize);
+  Node *alloc(int pid, UNIT size);
+  Node *buddyAlloc(int pid, UNIT size);
+  Node *slabAlloc(int pid, UNIT size);
+  Node *realloc(int pid, UNIT size);
+  bool free(int pid);
+  void dump();
+  ~MemoryManager();
+};
+
+
 
 #endif

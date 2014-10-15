@@ -1,6 +1,7 @@
 #include "tokenizer.h"
+#include <math.h>
 
-UNIT sizeToLevel(SIZE_TYPE type, UNIT num, UNIT total) {
+UNIT toStandardSize(SIZE_TYPE type, UNIT num) {
   switch (type) {
   case TB:
     return num << 30;
@@ -11,6 +12,19 @@ UNIT sizeToLevel(SIZE_TYPE type, UNIT num, UNIT total) {
   case KB:
     return num;
   default:
-    return 0;
+    return -1;
   }
+}
+
+int sizeToLevel(UNIT size) {
+  return ceil(log2(size));
+}
+
+UNIT nextPower2(UNIT size) {
+  // todo
+  return size;  
+}
+
+bool isSlabSize(UNIT size, UNIT slabSize) {
+  return (size > slabSize / 2) && (size <= slabSize);
 }
