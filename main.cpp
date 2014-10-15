@@ -11,33 +11,19 @@ using std::cout;
 using std::endl;
 
 int main() {
-  /*
-  Node *root = initSystem(8, 512);
-  //cout << "Successfully initialized" << endl;
-  vector<int> stack;
-  map<int, Node *> memLocation;
-
-  // root->alloc(1, 0, memLocation);
-  root->alloc(365, 13, memLocation); 
-  root->alloc(1758, 2, memLocation); 
-  root->alloc(3, 13, memLocation);
-  root->alloc(1, 13, memLocation);
-  root->alloc(2, 14, memLocation);
-  root->printTree(stack);
-  freeNode(memLocation, 5);
-  freeNode(memLocation, 365);
-  root->printTree(stack);
-  freeNode(memLocation, 3);
-  root->printTree(stack);
-  freeNode(memLocation, 2);
-  root->printTree(stack);
-  freeNode(memLocation, 1);
-  root->printTree(stack);
-  freeNode(memLocation, 1758);
-  root->printTree(stack);
-
-  // Clean up the memory
-  
-  delete root;*/
+  MemoryManager memManager(4<<20, 8, 512);
+  memManager.alloc(365, 500);
+  memManager.alloc(1758, 1<<20);
+  memManager.alloc(3, 300);
+  memManager.realloc(5, 600);
+  memManager.realloc(3, 400);
+  memManager.dump();
+  memManager.realloc(3, 1024);
+  memManager.dump();
+  memManager.free(3);
+  memManager.free(4);
+  memManager.free(1758);
+  memManager.free(365);
+  memManager.dump();
   return 0;
 }

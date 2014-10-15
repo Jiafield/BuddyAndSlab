@@ -17,11 +17,11 @@ MemoryManager::MemoryManager(UNIT total, int portion, UNIT slabSize) {
 
   totalLevel = sizeToLevel(total);
   slabTotalLevel = sizeToLevel(slabFreeSpace);
-  slabLevel = slabTotalLevel - sizeToLevel(slabSize);
   slabHeadLevel = totalLevel - sizeToLevel(slabFreeSpace);
+  slabLevel = slabTotalLevel - sizeToLevel(slabSize);
  
   root = new Node(totalLevel);
-  slabRoot = new Node(slabLevel);
+  slabRoot = new Node(slabTotalLevel);
 
   // Mark the slab head in the buddy tree;
   root->alloc(-1, slabHeadLevel, totalLevel); 
@@ -60,7 +60,7 @@ Node *MemoryManager::slabAlloc(int pid, UNIT size) {
     pidToPointer[pid] = newNode;
     return newNode;
   } else {
-    //borrow
+    // Borrow from buddy
     cout << "No space in slab for " << pid << endl;
     cout << "Borrow from buddy" << endl;
     return buddyAlloc(pid, size);
@@ -68,7 +68,24 @@ Node *MemoryManager::slabAlloc(int pid, UNIT size) {
 }
 
 Node *MemoryManager::realloc(int pid, UNIT size) {
-  return NULL;
+  if (pidToPointer.find(pid) == pidToPointer.end()) {
+    cout << "Realloc: never allocated memory for " << pid << " before." << endl;
+    return NULL;
+  }
+  Node *originNode = pidToPointer[pid];
+  int targetLevel;
+  if (isSlabSize(size, slabSize))
+    targetLevel = slabLevel;
+  else 
+    targetLevel = totalLevel - sizeToLevel(size);
+  if (targetLevel == originNode->getLevel()) {
+    // Case 1: the original size fit the new size
+    return originNode;
+  } else {
+    // Case 2: alloc new size for pid
+    free(pid);
+    return alloc(pid, size);
+  }
 }
 
 bool MemoryManager::free(int pid) {
@@ -78,19 +95,29 @@ bool MemoryManager::free(int pid) {
     vector<Node *> toBeDeleted;
     n->free(toBeDeleted, n->getLevel());
     for (vector<Node *>::iterator n = toBeDeleted.begin(); n != toBeDeleted.end(); n++) {
-      delete *n;
       pidToPointer.erase((*n)->getPID());
+      delete *n;
     }
     return true;
   } else {
     // Case 2: no where to find pid
-    cout << "couldn't find process " << pid << endl;
+    cout << "Free: couldn't find process " << pid << endl;
     return false;
   }
 }
 
 void MemoryManager::dump() {
+  vector<int> stack(slabHeadLevel, 0);
+  cout << endl << "Slab:" << endl;
+  slabRoot->printTree(stack);
+  stack.clear();
+  cout << endl << "Buddy:" << endl;
+  root->printTree(stack);
+}
 
+MemoryManager::~MemoryManager() {
+  delete root;
+  delete slabRoot;
 }
 
 // Constructor only use to initialize root
@@ -205,9 +232,8 @@ Node * Node::split(int splitLevel, int targetLevel, int totalLevel) {
 
 void Node::free(vector<Node *> &toBeDeleted, int l) {
   if (parent && parent->hasLevel(level)) {
-    cout << "Start free " << pid << endl;
     // Case 1: the node's sibling is also free, merge up
-    cout << "sibling is free " << endl;
+    //    cout << "sibling is free " << endl;
     toBeDeleted.push_back(parent->left);
     toBeDeleted.push_back(parent->right);
     parent->left = NULL;
@@ -216,7 +242,7 @@ void Node::free(vector<Node *> &toBeDeleted, int l) {
     parent->free(toBeDeleted, l);
   } else {
     // Case 2: the node's sibling is not free
-    cout << "sibling is not free " << endl;
+    //cout << "sibling is not free " << endl;
     this->status = FREE;
     // Update subtree status
     Node *p = this;
@@ -236,8 +262,10 @@ void Node::printTree(vector<int> &stack) {
       cout << *it;
     if (status == FREE)
       cout << " free" << endl;
-    else
-      cout << " " << this->getPID() << endl;
+    else if (pid == -1)
+      cout << " slab head" << endl;
+    else 
+      cout << " " << pid << endl;
     //    for (map<int, int>::iterator it)
     return;
   }
@@ -251,4 +279,9 @@ void Node::printTree(vector<int> &stack) {
   stack.pop_back();
 }
 
-Node::~Node() {}
+Node::~Node() {
+  if (left)
+    delete left;
+  if (right)
+    delete right;
+}
