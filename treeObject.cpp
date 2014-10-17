@@ -164,7 +164,6 @@ bool MemoryManager::free(int pid) {
     return true;
   } else {
     // Case 2: no where to find pid
-    cout << "Free: couldn't find process " << pid << endl;
     return false;
   }
 }
