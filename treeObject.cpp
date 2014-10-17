@@ -230,9 +230,7 @@ void Node::incrementStatus(int l) {
 Node* Node::alloc(int p, int l, int totalLevel) {
   // Base case:
   if (level == l && status == FREE) {
-    //cout << "Find free node for " << p << " level = " << level <<  endl;
     decrementStatus(l);
-    //cout << "Parent after" << p << " status " << (parent->subtreeStatus)[l] << endl;
     status = ALLOCATED;
     pid = p;
     return this;
@@ -240,8 +238,6 @@ Node* Node::alloc(int p, int l, int totalLevel) {
 
   if (hasLevel(l)) {
     // Case 1: there are free node in the level already
-    //decrementStatus(l);
-    //cout << "current level " << level << " target " << l << endl;
     if (left->hasLevel(l)) {
       return left->alloc(p, l, totalLevel);
     } else {
@@ -259,7 +255,6 @@ Node* Node::alloc(int p, int l, int totalLevel) {
     }
     // No level has free space to split, return false
     if (splitLevel == -1) {
-      //cout << "No space for alloc " << p << endl;
       return NULL;
     }
     // Split
@@ -275,11 +270,6 @@ Node *Node::split(int splitLevel, int targetLevel, int totalLevel) {
   }
   if (level < splitLevel) {
     // Case1: not arrived the split Level yet
-    // Update subtree status
-    //decrementStatus(splitLevel);
-    //for (int i = splitLevel + 1; i <= targetLevel; i++)
-    //  incrementStatus(i);
-    // continue to find the split node
     if (left->hasLevel(splitLevel)) {
       return left->split(splitLevel, targetLevel, totalLevel);
     } else {
@@ -290,13 +280,8 @@ Node *Node::split(int splitLevel, int targetLevel, int totalLevel) {
     // update the subtree status
     status = BRANCH;
     decrementStatus(level);
-    //for (int i = level + 1; i <= targetLevel; i++)
-    //  incrementStatus(i);
-    // split the node
     left = new Node(this, level + 1, totalLevel);
-    //    left->incrementStatus(level + 1);
     right = new Node(this, level + 1, totalLevel);
-    //    right->incrementStatus(level + 1);
     // Continue with left node
     return left->split(splitLevel, targetLevel, totalLevel);
   }
@@ -344,7 +329,6 @@ void Node::DFSFree(vector<Node *> toBeDeleted) {
 void Node::free(vector<Node *> &toBeDeleted, int l) {
   if (parent && parent->hasLevel(level)) {
     // Case 1: the node's sibling is also free, merge up
-    //    cout << "sibling is free " << endl;
     toBeDeleted.push_back(parent->left);
     toBeDeleted.push_back(parent->right);
     parent->left = NULL;
@@ -353,7 +337,6 @@ void Node::free(vector<Node *> &toBeDeleted, int l) {
     parent->free(toBeDeleted, l);
   } else {
     // Case 2: the node's sibling is not free
-    //cout << "sibling is not free " << endl;
     this->status = FREE;
     // Update subtree status
     incrementStatus(level);
@@ -373,7 +356,6 @@ void Node::printTree(vector<int> &stack) {
       cout << " slab head" << endl;
     else 
       cout << " " << pid << endl;
-    //    for (map<int, int>::iterator it)
     return;
   }
   // print left subtree
