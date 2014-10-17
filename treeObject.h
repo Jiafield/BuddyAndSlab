@@ -4,6 +4,8 @@
 #include <vector>
 #include <iostream>
 #include <map>
+#include <stack>
+#include <queue>
 #include "tokenizer.h"
 
 typedef enum {FREE, ALLOCATED, BRANCH} NodeStatus;
@@ -12,6 +14,8 @@ typedef enum {BUDDY, SLAB} MemType;
 
 using std::vector;
 using std::map;
+using std::queue;
+using std::stack;
 using std::cout;
 using std::endl;
 
@@ -26,7 +30,7 @@ class Node {
   NodeStatus status;    // True means the node is free, false means this node has been allocated to some process.
   vector<int> subtreeStatus; //Store the subtree status below the current node
 
-public:
+ public:
   // Constructor only use to initialize root
   Node(int totalLevel);
 
@@ -49,6 +53,10 @@ public:
 
   void free(vector<Node *> &toBeDeleted, int l);
 
+  void DFSTravesal(queue<Node *> freeQueues[], Node *root, int totalLevel, map<int, Node *>pidToPointer);
+  
+  void DFSFree(vector<Node *> toBeDeleted);
+  
   void printTree(vector<int> &);
 
   ~Node();
@@ -77,8 +85,10 @@ class MemoryManager {
   Node *alloc(int pid, UNIT size);
   Node *buddyAlloc(int pid, UNIT size);
   Node *slabAlloc(int pid, UNIT size);
+  Node *borrowBuddyAlloc(int pid, UNIT size);
   Node *borrowSlabAlloc(int pid, UNIT size);
   Node *realloc(int pid, UNIT size);
+  void compaction(Node *r);
   bool free(int pid);
   void dump();
   ~MemoryManager();

@@ -1,6 +1,8 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include <queue>
+#include <stack>
 #include "treeObject.h"
 #include "tokenizer.h"
 
@@ -8,6 +10,8 @@ using std::cout;
 using std::endl;
 using std::vector;
 using std::map;
+using std::queue;
+using std::stack;
 
 MemoryManager::MemoryManager(UNIT total, int portion, UNIT slabSize) {
   totalSpace = total;
@@ -38,50 +42,78 @@ Node *MemoryManager::alloc(int pid, UNIT size) {
 }
 
 Node *MemoryManager::buddyAlloc(int pid, UNIT size) {
-  if (buddyFreeSpace >= size) {
-    buddyFreeSpace -= size;
-    int targetLevel = totalLevel - sizeToLevel(size);
-    Node *newNode = root->alloc(pid, targetLevel, totalLevel);
-    pidToPointer[pid] = newNode;
-    return newNode;
-  } else {
-    //borrow from slab
-    if (slabFreeSpace >= size) {
+  int targetLevel = totalLevel - sizeToLevel(size);
+  Node *newNode = root->alloc(pid, targetLevel, totalLevel);
+  if (!newNode) {
+    // Try compaction
+    cout << "Compact buddy for " << pid << endl;
+    compaction(root);
+    newNode = root->alloc(pid, targetLevel, totalLevel);
+    if (!newNode) {
+      //borrow from slab
       cout << "Alloc: No space in buddy for " << pid << endl;
       cout << "Borrow from slab" << endl;
-      return borrowSlabAlloc(pid, size);
-    } else 
-      return NULL;
+      newNode = borrowSlabAlloc(pid, size);
+      if (!newNode)
+	return NULL;
+    }
   }
+  pidToPointer[pid] = newNode;
+  buddyFreeSpace -= size;
+  return newNode;
 }
 
+
 Node *MemoryManager::slabAlloc(int pid, UNIT size) {
-  if (slabFreeSpace >= size) {
-    slabFreeSpace -= slabSize;
-    Node *newNode = slabRoot->alloc(pid, slabLevel, slabTotalLevel);
-    pidToPointer[pid] = newNode;
-    return newNode;
-  } else {
-    // Borrow from buddy
-    if (buddyFreeSpace >= size) {
+  Node *newNode = slabRoot->alloc(pid, slabLevel, slabTotalLevel);
+  if (!newNode) {
+    // Compaction
+    cout << "Compact slab for " << pid << endl;
+    compaction(slabRoot);
+    newNode = slabRoot->alloc(pid, slabLevel, totalLevel);    
+    if (!newNode) {
+      // Borrow from buddy
       cout << "Alloc: No space in slab for " << pid << endl;
       cout << "Borrow from buddy" << endl;
-      return buddyAlloc(pid, size);
-    } else
-      return NULL;
+      newNode = borrowBuddyAlloc(pid, size);
+      if (!newNode)
+	return NULL;
+    }
   }
+  slabFreeSpace -= slabSize;
+  pidToPointer[pid] = newNode;
+  return newNode;
+}
+
+Node *MemoryManager::borrowBuddyAlloc(int pid, UNIT size) {
+  int targetLevel = totalLevel - sizeToLevel(size);
+  Node *newNode = root->alloc(pid, targetLevel, totalLevel);
+  if (!newNode) {
+    // Try compaction
+    cout << "Compact buddy" << endl;
+    compaction(root);
+    newNode = root->alloc(pid, targetLevel, totalLevel);
+    if (!newNode) {
+      return NULL;
+    }
+  }
+  pidToPointer[pid] = newNode;
+  buddyFreeSpace -= size;
+  return newNode;
 }
 
 Node *MemoryManager::borrowSlabAlloc(int pid, UNIT size) {
-  if (slabFreeSpace >= size) {
-    slabFreeSpace -= size;
-    int targetLevel = slabTotalLevel - sizeToLevel(size);
-    Node *newNode = slabRoot->alloc(pid, targetLevel, slabTotalLevel);
-    pidToPointer[pid] = newNode;
-    return newNode;
-  } else {
-    return NULL;
+  int targetLevel = slabTotalLevel - sizeToLevel(size);
+  Node *newNode = slabRoot->alloc(pid, targetLevel, slabTotalLevel);
+  if (!newNode) {
+    compaction(slabRoot);
+    newNode = slabRoot->alloc(pid, targetLevel, slabTotalLevel);
+    if (!newNode)
+      return NULL;
   }
+  pidToPointer[pid] = newNode;
+  slabFreeSpace -= size;
+  return newNode;
 }
 
 Node *MemoryManager::realloc(int pid, UNIT size) {
@@ -106,6 +138,18 @@ Node *MemoryManager::realloc(int pid, UNIT size) {
     // Case 2: alloc new size for pid
     free(pid);
     return alloc(pid, size);
+  }
+}
+
+void MemoryManager::compaction(Node *r) {
+  queue<Node *> freeQueues[totalLevel];
+  vector<Node *> toBeDeleted;
+  // DFS traversal
+  r->DFSTravesal(freeQueues, r, totalLevel, pidToPointer);
+  r->DFSFree(toBeDeleted);
+  for (vector<Node *>::iterator n = toBeDeleted.begin(); n != toBeDeleted.end(); n++) {
+    pidToPointer.erase((*n)->getPID());
+    delete *n;
   }
 }
 
@@ -172,10 +216,14 @@ bool Node::hasLevel(int l) {
 }
 
 void Node::decrementStatus(int l) {
+  if (parent)
+    parent->decrementStatus(l);
   subtreeStatus[l]--;
 }
 
 void Node::incrementStatus(int l) {
+  if (parent)
+    parent->incrementStatus(l);
   subtreeStatus[l]++;
 }
 
@@ -184,6 +232,7 @@ Node* Node::alloc(int p, int l, int totalLevel) {
   if (level == l && status == FREE) {
     //cout << "Find free node for " << p << " level = " << level <<  endl;
     decrementStatus(l);
+    //cout << "Parent after" << p << " status " << (parent->subtreeStatus)[l] << endl;
     status = ALLOCATED;
     pid = p;
     return this;
@@ -191,7 +240,8 @@ Node* Node::alloc(int p, int l, int totalLevel) {
 
   if (hasLevel(l)) {
     // Case 1: there are free node in the level already
-    decrementStatus(l);
+    //decrementStatus(l);
+    //cout << "current level " << level << " target " << l << endl;
     if (left->hasLevel(l)) {
       return left->alloc(p, l, totalLevel);
     } else {
@@ -199,7 +249,6 @@ Node* Node::alloc(int p, int l, int totalLevel) {
     }
   } else {
     // Case 2: need to split a free node to get the target level node
-    //cout << "Need to split for " << p << endl;
     // Find the lowest level that could split
     int splitLevel = -1;
     for (int i = l - 1; i >= 0; i--) {
@@ -219,7 +268,7 @@ Node* Node::alloc(int p, int l, int totalLevel) {
   }
 }
 
-Node * Node::split(int splitLevel, int targetLevel, int totalLevel) {
+Node *Node::split(int splitLevel, int targetLevel, int totalLevel) {
   // Base case: already arrived at the target level   
   if (level == targetLevel) {
     return this;
@@ -227,9 +276,9 @@ Node * Node::split(int splitLevel, int targetLevel, int totalLevel) {
   if (level < splitLevel) {
     // Case1: not arrived the split Level yet
     // Update subtree status
-    decrementStatus(splitLevel);
-    for (int i = splitLevel + 1; i <= targetLevel; i++)
-      incrementStatus(i);
+    //decrementStatus(splitLevel);
+    //for (int i = splitLevel + 1; i <= targetLevel; i++)
+    //  incrementStatus(i);
     // continue to find the split node
     if (left->hasLevel(splitLevel)) {
       return left->split(splitLevel, targetLevel, totalLevel);
@@ -241,13 +290,54 @@ Node * Node::split(int splitLevel, int targetLevel, int totalLevel) {
     // update the subtree status
     status = BRANCH;
     decrementStatus(level);
-    for (int i = level + 1; i <= targetLevel; i++)
-      incrementStatus(i);
+    //for (int i = level + 1; i <= targetLevel; i++)
+    //  incrementStatus(i);
     // split the node
     left = new Node(this, level + 1, totalLevel);
+    //    left->incrementStatus(level + 1);
     right = new Node(this, level + 1, totalLevel);
+    //    right->incrementStatus(level + 1);
     // Continue with left node
     return left->split(splitLevel, targetLevel, totalLevel);
+  }
+}
+
+void Node::DFSTravesal(queue<Node *> freeQueues[], Node *root, int totalLevel, map<int, Node *>pidToPointer) {
+  // Base case: arrive at leaf of tree
+  if (status == FREE) {
+    freeQueues[level].push(this);
+    return;
+  } else if (status == ALLOCATED) {
+    // Move the allocated node to the left most free node, if there is any
+    if (!freeQueues[level].empty()) {
+      root->alloc(pid, level, totalLevel);	
+      status = FREE;
+      incrementStatus(level);
+      freeQueues[level].pop();
+      freeQueues[level].push(this);
+    }
+    return;
+  }
+  // Check left subtree
+  left->DFSTravesal(freeQueues, root, totalLevel, pidToPointer);
+  // Check right subtree
+  right->DFSTravesal(freeQueues, root, totalLevel, pidToPointer);
+}
+
+void Node::DFSFree(vector<Node *> toBeDeleted) {
+  if (!left && !right)
+    return;
+  left->DFSFree(toBeDeleted);
+  right->DFSFree(toBeDeleted);
+  if (left->status == FREE && right->status == FREE) {
+    toBeDeleted.push_back(left);
+    //    decrementStatus(level + 1);
+    toBeDeleted.push_back(right);
+    //    decrementStatus(level + 1);
+    status = FREE;
+    left = NULL;
+    right = NULL;
+    incrementStatus(level);
   }
 }
 
@@ -266,13 +356,9 @@ void Node::free(vector<Node *> &toBeDeleted, int l) {
     //cout << "sibling is not free " << endl;
     this->status = FREE;
     // Update subtree status
-    Node *p = this;
-    while (p) {
-      for (int i = l; i > level; i--)
-	p->decrementStatus(i);
-      p->incrementStatus(level);
-      p = p->parent;
-    }
+    incrementStatus(level);
+    //for (int i = l; i > level; i--)
+    // decrementStatus(i);
   }
 }
 
@@ -305,4 +391,5 @@ Node::~Node() {
     delete left;
   if (right)
     delete right;
+  decrementStatus(level);
 }

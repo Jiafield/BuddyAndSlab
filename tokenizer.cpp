@@ -17,7 +17,7 @@ UNIT toStandardSize(SIZE_TYPE type, UNIT num) {
 }
 
 int sizeToLevel(UNIT size) {
-  return ceil(log2(size));
+  return ceil(log2(size)) + 1;
 }
 
 UNIT nextPower2(UNIT size) {
