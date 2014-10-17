@@ -5,6 +5,7 @@
 #include <iostream>
 #include <math.h>
 #include <string>
+#include <stdlib.h>
 
 using std::map;
 using std::vector;
@@ -20,10 +21,22 @@ int main() {
   while (getline(cin, line)) {
     data.push_back(line);
   }
-
   
   // Parse first 2 lines to get memory description
-  MemoryManager memManager(1<<10, 8, 4);
-  
+  int portion;
+  UNIT total = getMemorySize(data[0]);
+  if (!total) {
+    cout << "Read total memory size error!" << endl;
+    exit(EXIT_FAILURE);
+  }
+  UNIT slabSize = getSlabInfo(&portion, data[1]);
+  if (!slabSize) {
+    cout << "Read slab size error!" << endl;
+    exit(EXIT_FAILURE);
+  }
+
+  // Build memory manager
+  MemoryManager memManager(total, portion, slabSize);
+  memManager.dump();
   return 0;
 }

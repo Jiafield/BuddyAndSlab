@@ -1,6 +1,7 @@
 #include "tokenizer.h"
 #include <string>
 #include <iostream>
+#include <stdlib.h>
 #include <boost/regex.hpp>
 #include <math.h>
 #include <algorithm>
@@ -16,9 +17,9 @@ UNIT getMemorySize(string str) {
   boost::regex expr("memorySize\\(([0-9]*)([a-zA-Z]*)\\);");
   boost::cmatch results;
   if (boost::regex_match(str.c_str(), results, expr)) {
-    cout << results[1].str() << endl;
-    cout << results[2].str() << endl;
+    return toStandardSize(results[2].str(), atoi(results[1].str().c_str()));
   }
+  return 0;
 }
 
 UNIT getSlabInfo(int *portion, string str) {
@@ -28,26 +29,23 @@ UNIT getSlabInfo(int *portion, string str) {
   boost::regex expr("slabSize\\(([0-9]*)([a-zA-Z]*),1/([0-9]*)\\);");
   boost::cmatch results;
   if (boost::regex_match(str.c_str(), results, expr)) {
-    cout << results[1].str() << endl;
-    cout << results[2].str() << endl;
-    cout << results[3].str() << endl;
+    *portion = atoi(results[3].str().c_str());
+    return toStandardSize(results[2].str(), atoi(results[1].str().c_str()));
   }
-  
+  return 0;
 }
 
-UNIT toStandardSize(SIZE_TYPE type, UNIT num) {
-  switch (type) {
-  case TB:
+UNIT toStandardSize(string type, UNIT num) {
+  if (type.compare("TB") == 0)
     return num << 30;
-  case GB:
+  else if (type.compare("GB") == 0)
     return num << 20;
-  case MB:
+  else if (type.compare("MB") == 0)
     return num << 10;
-  case KB:
+  else if (type.compare("KB") == 0)
     return num;
-  default:
-    return -1;
-  }
+  else
+    return 0;
 }
 
 int sizeToLevel(UNIT size) {
