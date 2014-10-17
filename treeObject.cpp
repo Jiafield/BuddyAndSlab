@@ -41,6 +41,8 @@ Node *MemoryManager::alloc(int pid, UNIT size) {
 
 Node *MemoryManager::buddyAlloc(int pid, UNIT size) {
   int targetLevel = totalLevel - sizeToLevel(size);
+  if (targetLevel < 0)
+    return NULL;
   Node *newNode = root->alloc(pid, targetLevel, totalLevel);
   if (!newNode) {
     // Try compaction
@@ -85,6 +87,8 @@ Node *MemoryManager::slabAlloc(int pid, UNIT size) {
 
 Node *MemoryManager::borrowBuddyAlloc(int pid, UNIT size) {
   int targetLevel = totalLevel - sizeToLevel(size);
+  if (targetLevel < 0)
+    return NULL;
   Node *newNode = root->alloc(pid, targetLevel, totalLevel);
   if (!newNode) {
     // Try compaction
@@ -102,6 +106,8 @@ Node *MemoryManager::borrowBuddyAlloc(int pid, UNIT size) {
 
 Node *MemoryManager::borrowSlabAlloc(int pid, UNIT size) {
   int targetLevel = slabTotalLevel - sizeToLevel(size);
+  if (targetLevel < 0)
+    return NULL;
   Node *newNode = slabRoot->alloc(pid, targetLevel, slabTotalLevel);
   if (!newNode) {
     compaction(slabRoot);
