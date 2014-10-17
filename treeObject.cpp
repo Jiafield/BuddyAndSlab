@@ -2,7 +2,6 @@
 #include <vector>
 #include <map>
 #include <queue>
-#include <stack>
 #include "treeObject.h"
 #include "tokenizer.h"
 
@@ -11,7 +10,6 @@ using std::endl;
 using std::vector;
 using std::map;
 using std::queue;
-using std::stack;
 
 MemoryManager::MemoryManager(UNIT total, int portion, UNIT slabSize) {
   totalSpace = total;
