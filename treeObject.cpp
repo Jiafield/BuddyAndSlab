@@ -331,9 +331,9 @@ void Node::DFSFree(vector<Node *> toBeDeleted) {
   right->DFSFree(toBeDeleted);
   if (left->status == FREE && right->status == FREE) {
     toBeDeleted.push_back(left);
-    //    decrementStatus(level + 1);
+    decrementStatus(level + 1);
     toBeDeleted.push_back(right);
-    //    decrementStatus(level + 1);
+    decrementStatus(level + 1);
     status = FREE;
     left = NULL;
     right = NULL;
@@ -357,8 +357,8 @@ void Node::free(vector<Node *> &toBeDeleted, int l) {
     this->status = FREE;
     // Update subtree status
     incrementStatus(level);
-    //for (int i = l; i > level; i--)
-    // decrementStatus(i);
+    for (int i = l; i > level; i--)
+      decrementStatus(i);
   }
 }
 
@@ -391,5 +391,5 @@ Node::~Node() {
     delete left;
   if (right)
     delete right;
-  decrementStatus(level);
+  //decrementStatus(level);
 }

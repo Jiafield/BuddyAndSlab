@@ -14,7 +14,6 @@ int main() {
   MemoryManager memManager(1<<10, 8, 4);
   
   //for (int i = 0; i < 32; i++)
-  //   memManager.alloc(i, 4);
 
 
   //  memManager.alloc(365, 500);
@@ -37,17 +36,16 @@ int main() {
   memManager.alloc(1032, 1<<7);
   memManager.free(1026);
   //memManager.free(1028);
-  memManager.free(1030);
-  memManager.dump();
+  //  memManager.free(1030);
+  //  memManager.dump();
   memManager.alloc(1025, 1<<8);
+  //memManager.dump();
   //  memManager.dump();
   //memManager.free(3);
   //memManager.free(4);
   //memManager.free(1758);
   //memManager.free(365);
   //memManager.dump();
-  
-  
   // memManager.dump();
   
   return 0;
